@@ -39,15 +39,17 @@ PCI_DEVICE_IDS = {
     0x4014: "blackhole", 0x4015: "blackhole",
 }
 
-def detect_arch_type(chip):
+def detect_arch_type(chip, asic_idx=0):
     # Primary Method: pyluwen Downcasting
     try:
         chip.as_wh()
+        print(f"[ASIC {asic_idx}] Architecture detected via pyluwen Downcasting -> Wormhole")
         return "wormhole"
     except Exception:
         pass
     try:
         chip.as_bh()
+        print(f"[ASIC {asic_idx}] Architecture detected via pyluwen Downcasting -> Blackhole")
         return "blackhole"
     except Exception:
         pass
@@ -55,8 +57,11 @@ def detect_arch_type(chip):
     # Fallback Method: PCIe Device ID Lookup
     dev_id = getattr(chip, "device_id", None)
     if dev_id in PCI_DEVICE_IDS:
-        return PCI_DEVICE_IDS[dev_id]
+        arch = PCI_DEVICE_IDS[dev_id]
+        print(f"[ASIC {asic_idx}] Architecture detected via PCIe Device ID Lookup (0x{dev_id:04X}) -> {arch.capitalize()}")
+        return arch
 
+    print(f"[ASIC {asic_idx}] Architecture detection failed -> Defaulting to Wormhole fallback")
     return "wormhole"  # Default fallback
 
 def run_hardware_analysis(json_output_file="hardware_specs.json"):
@@ -72,7 +77,7 @@ def run_hardware_analysis(json_output_file="hardware_specs.json"):
     json_export_data = None
 
     for i, chip in enumerate(chips):
-        arch_key = detect_arch_type(chip)
+        arch_key = detect_arch_type(chip, asic_idx=i)
         specs = ARCH_SPECS[arch_key]
         telem = chip.get_telemetry()
 
@@ -97,7 +102,7 @@ def run_hardware_analysis(json_output_file="hardware_specs.json"):
 
         # Terminal Output
         board_id = hex(telem.board_id) if hasattr(telem, "board_id") and telem.board_id else "N/A"
-        print(f"[ASIC {i}] Architecture: {specs['name']} | Board ID: {board_id}")
+        print(f"Details for [ASIC {i}] ({specs['name']} | Board ID: {board_id}):")
         print(f"   ├─ Column Harvesting Status : {harvesting_msg}")
         print(f"   ├─ Compute Grid Topology   : {active_cols}x{active_rows} ({active_compute_cores} Active Compute Cores)")
         print(f"   ├─ Physical L1 SRAM / Core : {l1_phys / (1024**2):.2f} MB ({l1_phys / 1024:.1f} KB)")
